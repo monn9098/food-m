@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สั่งอาหารออนไลน์</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #2c3e50; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        select, input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .btn-order { background-color: #e74c3c; color: white; border: none; padding: 14px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        .btn-order:hover { background-color: #c0392b; }
+        .btn-order:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        #successBox { margin-top: 20px; padding: 15px; background: #e8f8f5; border: 1px solid #2ecc71; border-radius: 6px; display: none; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>🍔 สั่งอาหารออนไลน์</h2>
+        
+        <div class="form-group">
+            <label for="customerName">ชื่อผู้สั่ง / ชื่อเล่น:</label>
+            <input type="text" id="customerName" placeholder="เช่น คุณสมชาย หรือ ม.5/7 เลขที่ 14">
+        </div>
+
+        <div class="form-group">
+            <label for="menuSelect">เลือกเมนูอาหาร:</label>
+            <select id="menuSelect">
+                <!-- ดึงเมนูที่เปิดอยู่มาแสดง -->
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="spicy">ระดับความเผ็ด:</label>
+            <select id="spicy">
+                <option value="เผ็ดน้อย">เผ็ดน้อย</option>
+                <option value="เผ็ดกลาง" selected>เผ็ดกลาง</option>
+                <option value="เผ็ดมาก">เผ็ดมาก</option>
+                <option value="ไม่เผ็ด">ไม่เผ็ด</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="note">เพิ่มเติม / รสชาติพิเศษ:</label>
+            <input type="text" id="note" placeholder="เช่น เพิ่มไข่ดาว, เค็มน้อย, ไม่ใส่ผัก">
+        </div>
+
+        <button id="orderBtn" class="btn-order" onclick="submitOrder()">ยืนยันการสั่งซื้อ</button>
+
+        <div id="successBox">
+            <h3>🎉 สั่งซื้อสำเร็จ!</h3>
+            <p>เลขออเดอร์ของคุณคือ: <strong id="myOrderNum" style="font-size: 20px; color: #e74c3c;"></strong></p>
+            <p><small>กรุณาจำเลขออเดอร์และชื่อของคุณเพื่อมารับอาหาร</small></p>
+        </div>
+    </div>
+</div>
+
+<script>
+    function loadCustomerMenus() {
+        let menus = JSON.parse(localStorage.getItem('restaurant_menus')) || [
+            { id: 1, name: "ข้าวผัดกะเพราหมูสับ", price: 50, isOpen: true },
+            { id: 2, name: "ข้าวผัดคะน้าหมูกรอบ", price: 60, isOpen: true },
+            { id: 3, name: "ข้าวไข่เจียวหมูสับ", price: 40, isOpen: true }
+        ];
+
+        const menuSelect = document.getElementById('menuSelect');
+        const orderBtn = document.getElementById('orderBtn');
+        menuSelect.innerHTML = '';
+
+        const openMenus = menus.filter(m => m.isOpen);
+
+        if (openMenus.length === 0) {
+            menuSelect.innerHTML = '<option>ขออภัย เมนูหมดทุกรายการ</option>';
+            orderBtn.disabled = true;
+            return;
+        }
+
+        openMenus.forEach(menu => {
+            const option = document.createElement('option');
+            option.value = JSON.stringify(menu);
+            option.textContent = `${menu.name} (${menu.price} บาท)`;
+            menuSelect.appendChild(option);
+        });
+        orderBtn.disabled = false;
+    }
+
+    function submitOrder() {
+        const customerName = document.getElementById('customerName').value.trim();
+        if (!customerName) {
+            alert('กรุณากรอกชื่อผู้สั่งก่อนครับ!');
+            document.getElementById('customerName').focus();
+            return;
+        }
+
+        const menuData = JSON.parse(document.getElementById('menuSelect').value);
+        const spicy = document.getElementById('spicy').value;
+        const note = document.getElementById('note').value || 'ปกติ';
+
+        let orders = JSON.parse(localStorage.getItem('restaurant_orders')) || [];
+        let orderCounter = JSON.parse(localStorage.getItem('restaurant_counter')) || 1;
+        const orderId = 'O-' + String(orderCounter).padStart(3, '0');
+
+        const newOrder = {
+            id: orderId,
+            customer: customerName,
+            menu: `${menuData.name} (${menuData.price}฿)`,
+            detail: `เผ็ด: ${spicy} | หมายเหตุ: ${note}`,
+            status: 'รอคิว'
+        };
+
+        orders.push(newOrder);
+        orderCounter++;
+
+        localStorage.setItem('restaurant_orders', JSON.stringify(orders));
+        localStorage.setItem('restaurant_counter', JSON.stringify(orderCounter));
+
+        document.getElementById('myOrderNum').textContent = orderId;
+        document.getElementById('successBox').style.display = 'block';
+        document.getElementById('note').value = '';
+    }
+
+    window.onload = loadCustomerMenus;
+</script>
+
+</body>
+</html>
