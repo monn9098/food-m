@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบหลังบ้าน - จัดการร้านค้า</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 950px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2, h3 { margin-top: 0; color: #2c3e50; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; }
+
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; display: inline-block; }
+        .status-queue { background-color: #f1c40f; color: #7f8c8d; }
+        .status-cooking { background-color: #3498db; color: white; }
+        .status-done { background-color: #2ecc71; color: white; }
+
+        .btn-status { padding: 6px 10px; margin-right: 2px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-wait { background-color: #f1c40f; color: #333; }
+        .btn-cook { background-color: #3498db; color: white; }
+        .btn-ready { background-color: #2ecc71; color: white; }
+        .btn-delete { background-color: #e74c3c; color: white; }
+
+        .menu-manage-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f1f1; }
+        .badge-open { background-color: #2ecc71; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .badge-closed { background-color: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .btn-toggle { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; background-color: #34495e; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="card">
+        <h2>🛠️ ระบบหลังบ้าน (สำหรับร้านค้า)</h2>
+        <p>หน้านี้มีไว้สำหรับดูคิว ชื่อลูกค้า จัดการสถานะออเดอร์ และเปิด-ปิดเมนูอาหาร</p>
+    </div>
+
+    <!-- 1. จัดการเปิด-ปิดเมนู -->
+    <div class="card">
+        <h3>⚙️ จัดการสถานะเมนูอาหาร</h3>
+        <div id="menuManageList"></div>
+    </div>
+
+    <!-- 2. จัดการคิวออเดอร์ -->
+    <div class="card">
+        <h3>📋 รายการออเดอร์และคิวลูกค้า</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>เลขออเดอร์</th>
+                    <th>ชื่อผู้สั่ง</th>
+                    <th>รายการอาหาร</th>
+                    <th>รายละเอียด / รสชาติ</th>
+                    <th>สถานะ</th>
+                    <th>จัดการออเดอร์</th>
+                </tr>
+            </thead>
+            <tbody id="orderList">
+                <tr><td colspan="6" style="text-align: center; color: #888;">ยังไม่มีออเดอร์เข้ามา</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    let menus = JSON.parse(localStorage.getItem('restaurant_menus')) || [
+        { id: 1, name: "ข้าวผัดกะเพราหมูสับ", price: 50, isOpen: true },
+        { id: 2, name: "ข้าวผัดคะน้าหมูกรอบ", price: 60, isOpen: true },
+        { id: 3, name: "ข้าวไข่เจียวหมูสับ", price: 40, isOpen: true }
+    ];
+
+    function renderAdmin() {
+        const menuManageList = document.getElementById('menuManageList');
+        menuManageList.innerHTML = '';
+        menus.forEach((menu, index) => {
+            const div = document.createElement('div');
+            div.className = 'menu-manage-item';
+            div.innerHTML = `
+                <span><strong>${menu.name}</strong> (${menu.price} บาท)</span>
+                <div>
+                    <span class="${menu.isOpen ? 'badge-open' : 'badge-closed'}">
+                        ${menu.isOpen ? 'เปิดขายอยู่' : 'ปิด / หมด'}
+                    </span>
+                    <button class="btn-toggle" onclick="toggleMenu(${index})">
+                        ${menu.isOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+                    </button>
+                </div>
+            `;
+            menuManageList.appendChild(div);
+        });
+
+        let orders = JSON.parse(localStorage.getItem('restaurant_orders')) || [];
+        const tbody = document.getElementById('orderList');
+        
+        if (orders.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #888;">ยังไม่มีออเดอร์ในขณะนี้</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        orders.forEach((order, index) => {
+            let badgeClass = '';
+            if (order.status === 'รอคิว') badgeClass = 'status-queue';
+            else if (order.status === 'กำลังทำ') badgeClass = 'status-cooking';
+            else if (order.status === 'อาหารเสร็จแล้ว') badgeClass = 'status-done';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${order.id}</strong></td>
+                <td><strong style="color: #2980b9;">${order.customer}</strong></td>
+                <td>${order.menu}</td>
+                <td><small>${order.detail}</small></td>
+                <td><span class="status-badge ${badgeClass}">${order.status}</span></td>
+                <td>
+                    <button class="btn-status btn-wait" onclick="updateStatus(${index}, 'รอคิว')">รอ</button>
+                    <button class="btn-status btn-cook" onclick="updateStatus(${index}, 'กำลังทำ')">ทำ</button>
+                    <button class="btn-status btn-ready" onclick="updateStatus(${index}, 'อาหารเสร็จแล้ว')">เสร็จ</button>
+                    <button class="btn-status btn-delete" onclick="deleteOrder(${index})">ลบ</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function toggleMenu(index) {
+        menus[index].isOpen = !menus[index].isOpen;
+        localStorage.setItem('restaurant_menus', JSON.stringify(menus));
+        renderAdmin();
+    }
+
+    function updateStatus(index, newStatus) {
+        let orders = JSON.parse(localStorage.getItem('restaurant_orders')) || [];
+        orders[index].status = newStatus;
+        localStorage.setItem('restaurant_orders', JSON.stringify(orders));
+        renderAdmin();
+    }
+
+    function deleteOrder(index) {
+        let orders = JSON.parse(localStorage.getItem('restaurant_orders')) || [];
+        orders.splice(index, 1);
+        localStorage.setItem('restaurant_orders', JSON.stringify(orders));
+        renderAdmin();
+    }
+
+    window.onload = function() {
+        renderAdmin();
+        setInterval(renderAdmin, 2000);
+    };
+</script>
+
+</body>
+</html>
